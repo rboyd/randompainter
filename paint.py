@@ -52,17 +52,17 @@ async def main(page: ft.Page):
             ft.View(
                 "/",
                 [
-                    ft.AppBar(title=ft.Text("Flet app"), bgcolor=ft.colors.SURFACE_VARIANT),
-                    ft.ElevatedButton("Visit Store", on_click=lambda _: page.go("/store")),
+                    ft.AppBar(title=ft.Text("RandomPainter.xyz"), bgcolor=ft.colors.SURFACE_VARIANT),
+                    ft.ElevatedButton("Visit Simulator", on_click=lambda _: page.go("/simulator")),
                 ],
             )
         )
-        if page.route == "/store":
+        if page.route == "/simulator":
             page.views.append(
                 ft.View(
-                    "/store",
+                    "/simulator",
                     [
-                        ft.AppBar(title=ft.Text("Store"), bgcolor=ft.colors.SURFACE_VARIANT),
+                        ft.AppBar(title=ft.Text("Simulator"), bgcolor=ft.colors.SURFACE_VARIANT),
                         ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
                         ft.Text("Slider with 'on_change' event:"),
                         ft.Slider(min=0.001, max=2, label="{value}%", on_change=slider_changed),
