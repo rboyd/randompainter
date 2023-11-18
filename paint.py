@@ -48,12 +48,56 @@ async def main(page: ft.Page):
 
     def route_change(route):
         page.views.clear()
+
+        page.update()
+
+        GRID_WIDTH_MAX = 200
+        GRID_WIDTH_MIN = 10
+        GRID_HEIGHT_MIN = 10
+        GRID_HEIGHT_MAX = 100
+
+        height_error_text = ft.Text("Invalid input for Grid Height!", visible=False, color=ft.colors.RED)
+        width_error_text = ft.Text("Invalid input for Grid Width!", visible=False, color=ft.colors.RED)
+
+        def handle_change(e, error_text_control):
+            ranges = {height_error_text: {'min': GRID_HEIGHT_MIN, 'max': GRID_HEIGHT_MAX},
+                      width_error_text: {'min': GRID_WIDTH_MIN, 'max': GRID_WIDTH_MAX}}
+            try:
+                value = int(e.control.value)
+                if not (ranges[error_text_control]['min'] <= value <= ranges[error_text_control]['max']):
+                    error_text_control.visible = True
+                else:
+                    error_text_control.visible = False
+            except ValueError:
+                error_text_control.visible = True
+
+        tf_grid_height = ft.TextField(
+                    label="Grid Height",
+                    value=GRID_HEIGHT_MAX,
+                    max_length=len(str(GRID_HEIGHT_MAX)),
+                    keyboard_type=ft.KeyboardType.NUMBER,
+                    error_text=None,
+                    on_change=lambda e: handle_change(e, height_error_text),
+                )
+        tf_grid_width = ft.TextField(
+                    label="Grid Width",
+                    value=GRID_WIDTH_MAX,
+                    max_length=len(str(GRID_WIDTH_MAX)),
+                    keyboard_type=ft.KeyboardType.NUMBER,
+                    error_text=None,
+                    on_change=lambda e: handle_change(e, width_error_text),
+                )
         page.views.append(
             ft.View(
                 "/",
                 [
                     ft.AppBar(title=ft.Text("RandomPainter.xyz"), bgcolor=ft.colors.SURFACE_VARIANT),
+                    height_error_text,
+                    tf_grid_height,
+                    width_error_text,
+                    tf_grid_width,
                     ft.ElevatedButton("Visit Simulator", on_click=lambda _: page.go("/simulator")),
+
                 ],
             )
         )
