@@ -11,24 +11,37 @@ def random_grid_position(side, max_val):
 
 interval = 0.05
 
+GRID_WIDTH_MAX = 200
+GRID_WIDTH_MIN = 10
+GRID_HEIGHT_MIN = 10
+GRID_HEIGHT_MAX = 100
+grid_width = GRID_WIDTH_MAX
+grid_height = GRID_HEIGHT_MAX
+
 async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     """Add a rectangle to the canvas at a fixed interval."""
+    global grid_width, grid_height
     global interval
-    side = 20
     width = 600
     height = 400
-    
+
     while True:
-        i = random_grid_position(side, width)
-        j = random_grid_position(side, height)
+        cell_width_side = width/grid_width
+        cell_height_side = height/grid_height
+
+        i = random_grid_position(cell_width_side, width)
+        j = random_grid_position(cell_height_side, height)
 
         if i < width and j < height:
-            rect = cv.Rect(i, j, side, side, 0, ft.Paint(color=random.choice(COLORS)))
+            rect = cv.Rect(i, j, cell_width_side, cell_height_side, 0, ft.Paint(color=random.choice(COLORS)))
             cp.shapes.append(rect)
+
             await page.update_async()
             await asyncio.sleep(interval)
         else:
             break  # Once we fill the canvas, we stop adding rectangles
+
+drawing_task = None
 
 async def main(page: ft.Page):
     page.title = "Routes Example"
@@ -47,30 +60,24 @@ async def main(page: ft.Page):
         page.update()
 
     def route_change(route):
+        global drawing_task
+        if page.route == "/simulator":
+            # Start drawing only when on the /simulator page
+            if drawing_task is None or drawing_task.done():
+                cp.shapes.clear()
+                drawing_task = asyncio.create_task(add_rectangle_every_interval(page, cp))
+        else:
+            # Cancel the drawing task if we navigate away from the /simulator page
+            if drawing_task and not drawing_task.done():
+                drawing_task.cancel()
+                drawing_task = None
+
         page.views.clear()
 
         page.update()
 
-        GRID_WIDTH_MAX = 200
-        GRID_WIDTH_MIN = 10
-        GRID_HEIGHT_MIN = 10
-        GRID_HEIGHT_MAX = 100
-
         height_error_text = ft.Text("Invalid input for Grid Height!", visible=False, color=ft.colors.RED)
         width_error_text = ft.Text("Invalid input for Grid Width!", visible=False, color=ft.colors.RED)
-
-        def handle_change(e, error_text_control):
-            ranges = {height_error_text: {'min': GRID_HEIGHT_MIN, 'max': GRID_HEIGHT_MAX},
-                      width_error_text: {'min': GRID_WIDTH_MIN, 'max': GRID_WIDTH_MAX}}
-            try:
-                value = int(e.control.value)
-                if not (ranges[error_text_control]['min'] <= value <= ranges[error_text_control]['max']):
-                    error_text_control.visible = True
-                else:
-                    error_text_control.visible = False
-            except ValueError:
-                error_text_control.visible = True
-
         tf_grid_height = ft.TextField(
                     label="Grid Height",
                     value=GRID_HEIGHT_MAX,
@@ -87,6 +94,24 @@ async def main(page: ft.Page):
                     error_text=None,
                     on_change=lambda e: handle_change(e, width_error_text),
                 )
+
+        def handle_change(e, error_text_control):
+            global grid_width, grid_height
+            ranges = {height_error_text: {'min': GRID_HEIGHT_MIN, 'max': GRID_HEIGHT_MAX},
+                      width_error_text: {'min': GRID_WIDTH_MIN, 'max': GRID_WIDTH_MAX}}
+            try:
+                value = int(e.control.value)
+                if not (ranges[error_text_control]['min'] <= value <= ranges[error_text_control]['max']):
+                    error_text_control.visible = True
+                else:
+                    error_text_control.visible = False
+                    if error_text_control == height_error_text:
+                        grid_height = int(tf_grid_height.value)
+                    else:
+                        grid_width = int(tf_grid_width.value)
+            except ValueError:
+                error_text_control.visible = True
+
         page.views.append(
             ft.View(
                 "/",
@@ -125,8 +150,5 @@ async def main(page: ft.Page):
     page.on_route_change = route_change
     page.on_view_pop = view_pop
     page.go(page.route)
-
-    #await page.add_async(cp)
-    await add_rectangle_every_interval(page, cp)  # Add a rectangle every interval second
 
 ft.app(target=main, view=ft.AppView.WEB_BROWSER)
