@@ -2,8 +2,7 @@ import flet as ft
 import flet.canvas as cv
 import asyncio
 import random
-
-COLORS = ['#33ff0000', '#3300ff00', '#330000ff']
+from color_picker import ColorPicker
 
 def random_grid_position(side, max_val):
     """Generate a random position that aligns with the grid size."""
@@ -18,8 +17,13 @@ GRID_HEIGHT_MAX = 100
 grid_width = GRID_WIDTH_MAX
 grid_height = GRID_HEIGHT_MAX
 
+def check_dimensions():
+    global grid_width, grid_height
+    return (GRID_HEIGHT_MIN <= grid_height <= GRID_HEIGHT_MAX) and (GRID_WIDTH_MIN <= grid_width <= GRID_WIDTH_MAX)
+
 async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     """Add a rectangle to the canvas at a fixed interval."""
+    global color_pickers
     global grid_width, grid_height
     global interval
     width = 600
@@ -33,7 +37,9 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
         j = random_grid_position(cell_height_side, height)
 
         if i < width and j < height:
-            rect = cv.Rect(i, j, cell_width_side, cell_height_side, 0, ft.Paint(color=random.choice(COLORS)))
+            color_idx = random.randint(0, NUM_COLORS-1)
+
+            rect = cv.Rect(i, j, cell_width_side, cell_height_side, 0, ft.Paint(color=ft.colors.with_opacity(0.2, color_pickers[color_idx].icon_color)))
             cp.shapes.append(rect)
 
             await page.update_async()
@@ -43,7 +49,54 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
 
 drawing_task = None
 
+def new_color_icon():
+    async def open_color_picker(e):
+        e.control.page.dialog = d
+        d.open = True
+        await e.control.page.update_async()
+
+    color_picker = ColorPicker(color="#c8df6f", width=300)
+    color_icon = ft.IconButton(icon=ft.icons.BRUSH, on_click=open_color_picker)
+
+    async def change_color(e):
+        global visit_simulator_button
+        color_icon.icon_color = color_picker.color
+        d.open = False
+        visit_simulator_button.disabled = not (check_color_pickers() and check_dimensions())  # Update the button's disabled state
+        await e.control.page.update_async()
+
+    async def close_dialog(e):
+        d.open = False
+        await d.update_async()
+
+    d = ft.AlertDialog(
+        content=color_picker,
+        actions=[
+            ft.TextButton("OK", on_click=change_color),
+            ft.TextButton("Cancel", on_click=close_dialog),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+        on_dismiss=change_color,
+    )
+
+    return color_icon
+
+NUM_COLORS = 3
+color_pickers = [new_color_icon() for _ in range(NUM_COLORS)]
+
+def check_color_pickers():
+    global color_pickers
+    # Check if all color pickers have a color selected
+    return all(color_picker.icon_color != None for color_picker in color_pickers)
+
+visit_simulator_button = ft.ElevatedButton(
+    "Visit Simulator",
+    disabled=True  # Disable the button initially if not all colors are chosen
+)
+
 async def main(page: ft.Page):
+    global color_pickers
+    visit_simulator_button.on_click = lambda _: page.go("/simulator")
     page.title = "Routes Example"
     page.bgcolor = ft.colors.WHITE
     cp = cv.Canvas(
@@ -105,10 +158,12 @@ async def main(page: ft.Page):
                     error_text_control.visible = True
                 else:
                     error_text_control.visible = False
-                    if error_text_control == height_error_text:
-                        grid_height = int(tf_grid_height.value)
-                    else:
-                        grid_width = int(tf_grid_width.value)
+                if error_text_control == height_error_text:
+                    grid_height = int(tf_grid_height.value)
+                else:
+                    grid_width = int(tf_grid_width.value)
+                visit_simulator_button.disabled = not (check_color_pickers() and check_dimensions())
+                page.update()
             except ValueError:
                 error_text_control.visible = True
 
@@ -121,8 +176,8 @@ async def main(page: ft.Page):
                     tf_grid_height,
                     width_error_text,
                     tf_grid_width,
-                    ft.ElevatedButton("Visit Simulator", on_click=lambda _: page.go("/simulator")),
-
+                    ft.Row(controls=color_pickers),
+                    visit_simulator_button,
                 ],
             )
         )
