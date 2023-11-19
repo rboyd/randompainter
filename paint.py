@@ -3,6 +3,7 @@ import flet.canvas as cv
 import asyncio
 import random
 from color_picker import ColorPicker
+from grid_model import GridModel, StoppingCondition
 
 def random_grid_position(side, max_val):
     """Generate a random position that aligns with the grid size."""
@@ -21,6 +22,15 @@ def check_dimensions():
     global grid_width, grid_height
     return (GRID_HEIGHT_MIN <= grid_height <= GRID_HEIGHT_MAX) and (GRID_WIDTH_MIN <= grid_width <= GRID_WIDTH_MAX)
 
+stopping_labels = {StoppingCondition.ALL_FILLED: 'Canvas All Painted',
+                   StoppingCondition.SECOND_DROP: 'Any Square Painted Twice'}
+
+# Define a global variable to hold the selected stopping condition
+selected_stopping_condition = StoppingCondition.ALL_FILLED
+
+# Initialize the grid_model as None outside of the route_change function
+grid_model = None
+
 async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     """Add a rectangle to the canvas at a fixed interval."""
     global color_pickers
@@ -36,16 +46,27 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
         i = random_grid_position(cell_width_side, width)
         j = random_grid_position(cell_height_side, height)
 
-        if i < width and j < height:
-            color_idx = random.randint(0, NUM_COLORS-1)
+        color_idx = random.randint(0, NUM_COLORS-1)
 
-            rect = cv.Rect(i, j, cell_width_side, cell_height_side, 0, ft.Paint(color=ft.colors.with_opacity(0.2, color_pickers[color_idx].icon_color)))
-            cp.shapes.append(rect)
+        rect = cv.Rect(i, j, cell_width_side, cell_height_side, 0, ft.Paint(color=ft.colors.with_opacity(0.2, color_pickers[color_idx].icon_color)))
+        cp.shapes.append(rect)
 
-            await page.update_async()
-            await asyncio.sleep(interval)
-        else:
-            break  # Once we fill the canvas, we stop adding rectangles
+        # updage the GridModel
+        x, y = int(i // cell_width_side), int(j // cell_height_side)
+        stopping_condition = grid_model.paint(x, y)
+        if stopping_condition:
+            # Break out of the loop if a stopping condition is met
+            break
+
+        await page.update_async()
+        await asyncio.sleep(interval)
+
+    # If the loop is broken, add a text field indicating the simulation is complete
+    if stopping_condition:
+        completion_text = f"The simulation is complete: {stopping_labels[stopping_condition]}"
+        page.views[-1].controls.append(ft.Text(completion_text))
+        await page.update_async()
+
 
 drawing_task = None
 
@@ -113,8 +134,11 @@ async def main(page: ft.Page):
         page.update()
 
     def route_change(route):
-        global drawing_task
+        global drawing_task, grid_model, selected_stopping_condition
         if page.route == "/simulator":
+            # Initialize the GridModel when navigating to the simulator
+            grid_model = GridModel(grid_width, grid_height, selected_stopping_condition)  # or StoppingCondition.SECOND_DROP based on your logic
+
             # Start drawing only when on the /simulator page
             if drawing_task is None or drawing_task.done():
                 cp.shapes.clear()
@@ -167,6 +191,26 @@ async def main(page: ft.Page):
             except ValueError:
                 error_text_control.visible = True
 
+        # Define the function to handle the change in the radio group selection
+        def stopping_condition_changed(e):
+            global selected_stopping_condition
+            if e.control.value == "Canvas All Painted":
+                selected_stopping_condition = StoppingCondition.ALL_FILLED
+            elif e.control.value == "Any Square Painted Twice":
+                selected_stopping_condition = StoppingCondition.SECOND_DROP
+
+        stopping_condition_label = ft.Text("Stopping Condition:")
+
+        # Create the radio group with the stopping conditions
+        stopping_condition_radio_group = ft.RadioGroup(
+            content=ft.Column([
+                ft.Radio(value="Canvas All Painted", label="Canvas All Painted"),
+                ft.Radio(value="Any Square Painted Twice", label="Any Square Painted Twice")
+            ]),
+            on_change=stopping_condition_changed,
+            value="Canvas All Painted"  # Default selected value
+        )
+
         page.views.append(
             ft.View(
                 "/",
@@ -177,6 +221,8 @@ async def main(page: ft.Page):
                     width_error_text,
                     tf_grid_width,
                     ft.Row(controls=color_pickers),
+                    stopping_condition_label,
+                    stopping_condition_radio_group,
                     visit_simulator_button,
                 ],
             )
