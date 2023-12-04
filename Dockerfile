@@ -2,11 +2,13 @@ FROM python:3
 
 WORKDIR /usr/src/app
 
-#COPY requirements.txt ./
 #RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install flet --upgrade
 
 COPY paint.py ./
+COPY color_picker ./color_picker
+COPY grid_model ./grid_model
+#COPY requirements.txt ./
 RUN flet publish paint.py
 
 
