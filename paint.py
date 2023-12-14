@@ -4,6 +4,7 @@ import asyncio
 import random
 from color_picker import ColorPicker
 from grid_model import GridModel, StoppingCondition
+from chart import ScatterChart
 
 def random_grid_position(side, max_val):
     """Generate a random position that aligns with the grid size."""
@@ -65,6 +66,15 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     if stopping_condition:
         completion_text = f"The simulation is complete: {stopping_labels[stopping_condition]}"
         page.views[-1].controls.append(ft.Text(completion_text))
+
+        # Create the "Continue" button
+        continue_button = ft.ElevatedButton(
+            "Continue",
+            on_click=lambda _: page.go("/experiment")  # Navigate to the "/experiment" route when clicked
+        )
+        # Add the "Continue" button to the page's controls
+        page.views[-1].controls.append(continue_button)
+
         await page.update_async()
 
 
@@ -114,6 +124,82 @@ visit_simulator_button = ft.ElevatedButton(
     "Visit Simulator",
     disabled=True  # Disable the button initially if not all colors are chosen
 )
+
+
+# Constants for experiment limits
+MAX_VALUES = 5  # Justification: This limit ensures manageable computation time and clear visualization in graphs.
+MIN_DIMENSION = 1
+MAX_DIMENSION = 100
+MIN_REPETITIONS = 1
+MAX_REPETITIONS = 100
+
+
+# Function to create the form for the experiment page
+def create_experiment_form(page):
+    # Placeholder for dynamic controls
+    dynamic_controls_view = ft.Column()
+
+    # Define the event handler for the independent variable dropdown change
+    def handle_independent_variable_change(e):
+        # Clear existing dynamic controls
+        dynamic_controls_view.controls.clear()
+
+        # Add new controls based on the selected independent variable
+        if e.control.value == "D":
+            # If 'D' is selected, only ask for the number of repetitions
+            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
+            dynamic_controls_view.controls.append(repetitions_input)
+        elif e.control.value == "X":
+            # If 'X' is selected, ask for Y dimension and number of repetitions
+            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
+            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
+            dynamic_controls_view.controls.extend([y_dimension_input, repetitions_input])
+        elif e.control.value == "R":
+            # If 'R' is selected, ask for both X and Y dimensions
+            x_dimension_input = ft.TextField(label="X:", hint_text="Enter X dimension")
+            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
+            dynamic_controls_view.controls.extend([x_dimension_input, y_dimension_input])
+
+        # Update the page to show the new controls
+        page.update()
+
+
+    def handle_values_input_change(e):
+        # Logic to validate and handle the input values
+        pass
+    # Create controls for selecting the independent variable
+    independent_variable_label = ft.Text("Select Independent Variable:")
+    independent_variable_dropdown = ft.Dropdown(
+        label="Independent Variable",
+        options=[ft.dropdown.Option("D"),
+                 ft.dropdown.Option("X"),
+                 ft.dropdown.Option("R")],
+        on_change=handle_independent_variable_change
+    )
+
+    # Create controls for inputting values
+    values_label = ft.Text("Enter values for the Independent Variable (comma-separated):")
+    values_input = ft.TextField(
+        label="Values",
+        hint_text="e.g., 2, 4, 8, 16",
+        on_change=handle_values_input_change
+    )
+
+    # Add the form to the page
+    page.views.append(
+        ft.View(
+            "/experiment",
+            [
+                independent_variable_label,
+                independent_variable_dropdown,
+                values_label,
+                values_input,
+                dynamic_controls_view,
+            ],
+            bgcolor=ft.colors.WHITE
+        )
+    )
+
 
 async def main(page: ft.Page):
     global color_pickers
@@ -241,6 +327,23 @@ async def main(page: ft.Page):
                     bgcolor=ft.colors.WHITE
                 )
             )
+        if page.route == "/results":
+            scatter_chart = ScatterChart()
+            page.views.append(
+                ft.View(
+                    "/results",
+                    [
+                        ft.AppBar(title=ft.Text("Results"), bgcolor=ft.colors.SURFACE_VARIANT),
+                        ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
+                        scatter_chart
+                    ],
+                    bgcolor=ft.colors.WHITE
+                )
+            )
+
+        if page.route == "/experiment":
+            create_experiment_form(page)
+
         page.update()
 
     def view_pop(view):
