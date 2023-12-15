@@ -16,8 +16,8 @@ GRID_WIDTH_MAX = 200
 GRID_WIDTH_MIN = 10
 GRID_HEIGHT_MIN = 10
 GRID_HEIGHT_MAX = 100
-grid_width = GRID_WIDTH_MAX
-grid_height = GRID_HEIGHT_MAX
+grid_width = GRID_WIDTH_MIN
+grid_height = GRID_HEIGHT_MIN
 
 def check_dimensions():
     global grid_width, grid_height
@@ -65,7 +65,7 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     # If the loop is broken, add a text field indicating the simulation is complete
     if stopping_condition:
         completion_text = f"The simulation is complete: {stopping_labels[stopping_condition]}"
-        page.views[-1].controls.append(ft.Text(completion_text))
+        page.views[-1].controls.append(ft.Text(completion_text, color=ft.colors.BLACK))
 
         # Create the "Continue" button
         continue_button = ft.ElevatedButton(
@@ -243,7 +243,7 @@ async def main(page: ft.Page):
         width_error_text = ft.Text("Invalid input for Grid Width!", visible=False, color=ft.colors.RED)
         tf_grid_height = ft.TextField(
                     label="Grid Height",
-                    value=GRID_HEIGHT_MAX,
+                    value=GRID_HEIGHT_MIN,
                     max_length=len(str(GRID_HEIGHT_MAX)),
                     keyboard_type=ft.KeyboardType.NUMBER,
                     error_text=None,
@@ -251,7 +251,7 @@ async def main(page: ft.Page):
                 )
         tf_grid_width = ft.TextField(
                     label="Grid Width",
-                    value=GRID_WIDTH_MAX,
+                    value=GRID_WIDTH_MIN,
                     max_length=len(str(GRID_WIDTH_MAX)),
                     keyboard_type=ft.KeyboardType.NUMBER,
                     error_text=None,
@@ -337,7 +337,8 @@ async def main(page: ft.Page):
                         ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
                         scatter_chart
                     ],
-                    bgcolor=ft.colors.WHITE
+                    bgcolor=ft.colors.WHITE,
+                    scroll=ft.ScrollMode.AUTO,
                 )
             )
 
