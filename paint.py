@@ -4,6 +4,7 @@ import asyncio
 import random
 from color_picker import ColorPicker
 from grid_model import GridModel, StoppingCondition
+from chart import ScatterChart
 
 def random_grid_position(side, max_val):
     """Generate a random position that aligns with the grid size."""
@@ -15,8 +16,8 @@ GRID_WIDTH_MAX = 200
 GRID_WIDTH_MIN = 10
 GRID_HEIGHT_MIN = 10
 GRID_HEIGHT_MAX = 100
-grid_width = GRID_WIDTH_MAX
-grid_height = GRID_HEIGHT_MAX
+grid_width = GRID_WIDTH_MIN
+grid_height = GRID_HEIGHT_MIN
 
 def check_dimensions():
     global grid_width, grid_height
@@ -31,7 +32,7 @@ selected_stopping_condition = StoppingCondition.ALL_FILLED
 # Initialize the grid_model as None outside of the route_change function
 grid_model = None
 
-async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
+async def add_rectangle_every_interval(page: ft.Page, content_section: ft.Column, cp: cv.Canvas):
     """Add a rectangle to the canvas at a fixed interval."""
     global color_pickers
     global grid_width, grid_height
@@ -64,7 +65,16 @@ async def add_rectangle_every_interval(page: ft.Page, cp: cv.Canvas):
     # If the loop is broken, add a text field indicating the simulation is complete
     if stopping_condition:
         completion_text = f"The simulation is complete: {stopping_labels[stopping_condition]}"
-        page.views[-1].controls.append(ft.Text(completion_text))
+        content_section.controls.append(ft.Text(completion_text, color=ft.colors.BLACK))
+
+        # Create the "Continue" button
+        continue_button = ft.ElevatedButton(
+            "Continue",
+            on_click=lambda _: page.go("/experiment")  # Navigate to the "/experiment" route when clicked
+        )
+        # Add the "Continue" button to the page's controls
+        content_section.controls.append(continue_button)
+
         await page.update_async()
 
 
@@ -115,16 +125,121 @@ visit_simulator_button = ft.ElevatedButton(
     disabled=True  # Disable the button initially if not all colors are chosen
 )
 
+
+# Constants for experiment limits
+MAX_VALUES = 5  # Justification: This limit ensures manageable computation time and clear visualization in graphs.
+MIN_DIMENSION = 1
+MAX_DIMENSION = 100
+MIN_REPETITIONS = 1
+MAX_REPETITIONS = 100
+
+
+# Function to create the form for the experiment page
+def create_experiment_form(page):
+    # Placeholder for dynamic controls
+    dynamic_controls_view = ft.Column()
+
+    # Define the event handler for the independent variable dropdown change
+    def handle_independent_variable_change(e):
+        # Clear existing dynamic controls
+        dynamic_controls_view.controls.clear()
+
+        # Add new controls based on the selected independent variable
+        if e.control.value == "D":
+            # If 'D' is selected, only ask for the number of repetitions
+            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
+            dynamic_controls_view.controls.append(repetitions_input)
+        elif e.control.value == "X":
+            # If 'X' is selected, ask for Y dimension and number of repetitions
+            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
+            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
+            dynamic_controls_view.controls.extend([y_dimension_input, repetitions_input])
+        elif e.control.value == "R":
+            # If 'R' is selected, ask for both X and Y dimensions
+            x_dimension_input = ft.TextField(label="X:", hint_text="Enter X dimension")
+            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
+            dynamic_controls_view.controls.extend([x_dimension_input, y_dimension_input])
+        page.update()
+
+    def handle_values_input_change(e):
+        # Logic to validate and handle the input values
+        pass
+    # Create controls for selecting the independent variable
+    independent_variable_label = ft.Text("Select Independent Variable:")
+    independent_variable_dropdown = ft.Dropdown(
+        label="Independent Variable",
+        options=[ft.dropdown.Option("D"),
+                 ft.dropdown.Option("X"),
+                 ft.dropdown.Option("R")],
+        on_change=handle_independent_variable_change
+    )
+
+    # Create controls for inputting values
+    values_label = ft.Text("Enter values for the Independent Variable (comma-separated):")
+    values_input = ft.TextField(
+        label="Values",
+        hint_text="e.g., 2, 4, 8, 16",
+        on_change=handle_values_input_change
+    )
+
+    return ft.Column(
+                    [
+                        independent_variable_label,
+                        independent_variable_dropdown,
+                        values_label,
+                        values_input,
+                        dynamic_controls_view,
+                    ],
+                    alignment=ft.MainAxisAlignment.START, expand=8
+                )
+
 async def main(page: ft.Page):
     global color_pickers
     visit_simulator_button.on_click = lambda _: page.go("/simulator")
-    page.title = "Routes Example"
+    page.title = "RandomPainter.xyz"
     page.bgcolor = ft.colors.WHITE
     cp = cv.Canvas(
         [],  # Start with an empty list of shapes
         width=600,
         height=400
     )
+
+
+    navigation_rail = ft.NavigationRail(
+        selected_index=0,
+        label_type=ft.NavigationRailLabelType.ALL,
+        # extended=True,
+        min_width=30,
+        min_extended_width=400,
+        group_alignment=-0.9,
+        destinations=[
+            ft.NavigationRailDestination(icon=ft.icons.HOME, label="Home"),
+            ft.NavigationRailDestination(icon=ft.icons.GAMEPAD, label="Simulator"),
+            ft.NavigationRailDestination(icon=ft.icons.SCIENCE_ROUNDED, label="Experiment"),
+            # Do not add a destination for "/results" as it should not be directly navigable
+        ],
+        on_change=lambda e: handle_navigation(e, page),
+        height=600,
+        expand=2
+    )
+
+    # Define the event handler for the NavigationRail
+    def handle_navigation(event, page):
+        # Map the index to routes
+        index_to_route = {
+            0: "/",
+            1: "/simulator",
+            2: "/experiment",
+        }
+        # Navigate to the selected page
+        selected_route = index_to_route.get(event.control.selected_index)
+        if selected_route:
+            page.go(selected_route)
+
+
+
+
+
 
     t = ft.Text()
     def slider_changed(e):
@@ -135,14 +250,25 @@ async def main(page: ft.Page):
 
     def route_change(route):
         global drawing_task, grid_model, selected_stopping_condition
+#        page.views.insert(0, navigation_rail)
+
         if page.route == "/simulator":
-            # Initialize the GridModel when navigating to the simulator
+            content_section = ft.Column(
+                    [
+#                        ft.AppBar(title=ft.Text("Simulator"), bgcolor=ft.colors.SURFACE_VARIANT),
+#                        ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
+                        ft.Text("Painting Speed:"),
+                        ft.Slider(min=0.001, max=2, label="{value}%", on_change=slider_changed),
+                        cp
+                    ],
+                    alignment=ft.MainAxisAlignment.START, expand=8
+                )            # Initialize the GridModel when navigating to the simulator
             grid_model = GridModel(grid_width, grid_height, selected_stopping_condition)  # or StoppingCondition.SECOND_DROP based on your logic
 
             # Start drawing only when on the /simulator page
             if drawing_task is None or drawing_task.done():
                 cp.shapes.clear()
-                drawing_task = asyncio.create_task(add_rectangle_every_interval(page, cp))
+                drawing_task = asyncio.create_task(add_rectangle_every_interval(page, content_section, cp))
         else:
             # Cancel the drawing task if we navigate away from the /simulator page
             if drawing_task and not drawing_task.done():
@@ -157,7 +283,7 @@ async def main(page: ft.Page):
         width_error_text = ft.Text("Invalid input for Grid Width!", visible=False, color=ft.colors.RED)
         tf_grid_height = ft.TextField(
                     label="Grid Height",
-                    value=GRID_HEIGHT_MAX,
+                    value=GRID_HEIGHT_MIN,
                     max_length=len(str(GRID_HEIGHT_MAX)),
                     keyboard_type=ft.KeyboardType.NUMBER,
                     error_text=None,
@@ -165,7 +291,7 @@ async def main(page: ft.Page):
                 )
         tf_grid_width = ft.TextField(
                     label="Grid Width",
-                    value=GRID_WIDTH_MAX,
+                    value=GRID_WIDTH_MIN,
                     max_length=len(str(GRID_WIDTH_MAX)),
                     keyboard_type=ft.KeyboardType.NUMBER,
                     error_text=None,
@@ -211,36 +337,52 @@ async def main(page: ft.Page):
             value="Canvas All Painted"  # Default selected value
         )
 
-        page.views.append(
-            ft.View(
-                "/",
-                [
-                    ft.AppBar(title=ft.Text("RandomPainter.xyz"), bgcolor=ft.colors.SURFACE_VARIANT),
-                    height_error_text,
-                    tf_grid_height,
-                    width_error_text,
-                    tf_grid_width,
-                    ft.Row(controls=color_pickers),
-                    stopping_condition_label,
-                    stopping_condition_radio_group,
-                    visit_simulator_button,
-                ],
-            )
-        )
         if page.route == "/simulator":
-            page.views.append(
-                ft.View(
-                    "/simulator",
+            pass
+        elif page.route == "/results":
+            scatter_chart = ScatterChart()
+            content_section = ft.Column(
                     [
-                        ft.AppBar(title=ft.Text("Simulator"), bgcolor=ft.colors.SURFACE_VARIANT),
-                        ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
-                        ft.Text("Slider with 'on_change' event:"),
-                        ft.Slider(min=0.001, max=2, label="{value}%", on_change=slider_changed),
-                        cp
+                        scatter_chart
                     ],
-                    bgcolor=ft.colors.WHITE
+                    alignment=ft.MainAxisAlignment.START, expand=8
                 )
+        elif page.route == "/experiment":
+            content_section = create_experiment_form(page)
+        else: # page.route == "/":
+            content_section = ft.Column(
+                    [
+                        height_error_text,
+                        tf_grid_height,
+                        width_error_text,
+                        tf_grid_width,
+                        ft.Row(controls=color_pickers),
+                        stopping_condition_label,
+                        stopping_condition_radio_group,
+                        visit_simulator_button,
+                    ],
+                    alignment=ft.MainAxisAlignment.START, expand=8, scroll=ft.ScrollMode.ALWAYS
+                )
+
+        row = ft.Row(
+                [
+                    navigation_rail,
+                    ft.VerticalDivider(width=1),
+                    content_section,
+                ],
+                expand=True,
+#                height=600,
+                alignment=ft.MainAxisAlignment.START
             )
+
+            # Wrap the column in a container to set the background color
+        container_with_bgcolor = ft.Container(
+            content=row,
+            bgcolor=ft.colors.WHITE,  # Set the background color here
+            expand=True
+        )
+
+        page.views.append(container_with_bgcolor)
         page.update()
 
     def view_pop(view):
