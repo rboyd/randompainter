@@ -257,7 +257,7 @@ async def main(page: ft.Page):
                     [
 #                        ft.AppBar(title=ft.Text("Simulator"), bgcolor=ft.colors.SURFACE_VARIANT),
 #                        ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
-                        ft.Text("Slider with 'on_change' event:"),
+                        ft.Text("Painting Speed:"),
                         ft.Slider(min=0.001, max=2, label="{value}%", on_change=slider_changed),
                         cp
                     ],
@@ -343,8 +343,6 @@ async def main(page: ft.Page):
             scatter_chart = ScatterChart()
             content_section = ft.Column(
                     [
-                        ft.AppBar(title=ft.Text("Results"), bgcolor=ft.colors.SURFACE_VARIANT),
-                        ft.ElevatedButton("Go Home", on_click=lambda _: page.go("/")),
                         scatter_chart
                     ],
                     alignment=ft.MainAxisAlignment.START, expand=8
