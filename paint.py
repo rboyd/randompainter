@@ -139,7 +139,9 @@ MAX_REPETITIONS = 100
 def create_experiment_form(page):
     # Placeholder for dynamic controls
     dynamic_controls_view = ft.Column()
-
+    repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
+    x_dimension_input = ft.TextField(label="X:", hint_text="Enter X dimension")
+    y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
     # Define the event handler for the independent variable dropdown change
     def handle_independent_variable_change(e):
         # Clear existing dynamic controls
@@ -148,17 +150,12 @@ def create_experiment_form(page):
         # Add new controls based on the selected independent variable
         if e.control.value == "D":
             # If 'D' is selected, only ask for the number of repetitions
-            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
             dynamic_controls_view.controls.append(repetitions_input)
         elif e.control.value == "X":
             # If 'X' is selected, ask for Y dimension and number of repetitions
-            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
-            repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
             dynamic_controls_view.controls.extend([y_dimension_input, repetitions_input])
         elif e.control.value == "R":
             # If 'R' is selected, ask for both X and Y dimensions
-            x_dimension_input = ft.TextField(label="X:", hint_text="Enter X dimension")
-            y_dimension_input = ft.TextField(label="Y:", hint_text="Enter Y dimension")
             dynamic_controls_view.controls.extend([x_dimension_input, y_dimension_input])
         page.update()
 
@@ -183,6 +180,57 @@ def create_experiment_form(page):
         on_change=handle_values_input_change
     )
 
+    async def run_simulations(e):
+        values = list(map(int, values_input.value.split(',')))
+        total_simulations = 0
+        results = []
+        independent_variable = independent_variable_dropdown.value
+        color1, color2, color3 = [color_pickers[color_idx].icon_color for color_idx in range(3)]
+        simulations_run = 0
+        if independent_variable == "D":
+            repetitions = int(repetitions_input.value)
+            total_simulations = len(values) * repetitions
+            for x in values:
+                for _ in range(repetitions):
+                    result = await PAINT_ONCE(x, x, color1, color2, color3, selected_stopping_condition)
+                    simulations_run += 1
+                    progress_indicator.value = simulations_run / total_simulations
+                    await progress_indicator.update_async()
+                    results.append(result)
+        elif independent_variable == "X":
+            y_dimension = int(y_dimension_input.value)
+            repetitions = int(repetitions_input.value)
+            total_simulations = len(values) * repetitions
+            for x in values:
+                for _ in range(repetitions):
+                    result = await PAINT_ONCE(x, y_dimension, color1, color2, color3, selected_stopping_condition)
+                    simulations_run += 1
+                    progress_indicator.value = simulations_run / total_simulations
+                    await progress_indicator.update_async()
+                    results.append(result)
+        elif independent_variable == "R":
+            x_dimension = int(x_dimension_input.value)
+            y_dimension = int(y_dimension_input.value)
+            for r in values:
+                total_simulations += r
+                for _ in range(r):
+                    result = await PAINT_ONCE(x_dimension, y_dimension, color1, color2, color3, selected_stopping_condition)
+                    simulations_run += 1
+                    progress_indicator.value = simulations_run / total_simulations
+                    await progress_indicator.update_async()
+                    results.append(result)
+
+        page.go("/results")
+
+
+    continue_button = ft.ElevatedButton("Continue", on_click=run_simulations)
+    progress_indicator = ft.ProgressBar(value=0)
+    results = []
+
+
+    async def PAINT_ONCE(x, y, c1, c2, c3, s):
+        return {} # simulation_result
+
     return ft.Column(
                     [
                         independent_variable_label,
@@ -190,8 +238,10 @@ def create_experiment_form(page):
                         values_label,
                         values_input,
                         dynamic_controls_view,
+                        continue_button,
+                        progress_indicator
                     ],
-                    alignment=ft.MainAxisAlignment.START, expand=8
+                    alignment=ft.MainAxisAlignment.START, expand=8, scroll=ft.ScrollMode.ALWAYS
                 )
 
 async def main(page: ft.Page):
