@@ -54,7 +54,8 @@ async def add_rectangle_every_interval(page: ft.Page, content_section: ft.Column
 
         # updage the GridModel
         x, y = int(i // cell_width_side), int(j // cell_height_side)
-        stopping_condition = grid_model.paint(x, y)
+        stopping_condition = grid_model.paint(x, y, color_pickers[color_idx].icon_color)
+        print(stopping_condition)
         if stopping_condition:
             # Break out of the loop if a stopping condition is met
             break
@@ -64,7 +65,7 @@ async def add_rectangle_every_interval(page: ft.Page, content_section: ft.Column
 
     # If the loop is broken, add a text field indicating the simulation is complete
     if stopping_condition:
-        completion_text = f"The simulation is complete: {stopping_labels[stopping_condition]}"
+        completion_text = f"The simulation is complete: {stopping_labels[selected_stopping_condition]}"
         content_section.controls.append(ft.Text(completion_text, color=ft.colors.BLACK))
 
         # Create the "Continue" button
