@@ -283,15 +283,18 @@ def create_results_page(page: ft.Page):
             ]
 
     for result in results:
+        result['A1'] = result['drops_by_color'].get(A1_color, 0)
+        result['A2'] = result['drops_by_color'].get(A2_color, 0)
+        result['A3'] = result['drops_by_color'].get(A3_color, 0)
         rows.append(ft.DataRow(cells=[
-            ft.DataCell(ft.Text(str(result['x']))),
-            ft.DataCell(ft.Text(str(result['y']))),
-            ft.DataCell(ft.Text(str(result['total_drops']))),
-            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A1_color, 0)))),
-            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A2_color, 0)))),
-            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A3_color, 0)))),
-            ft.DataCell(ft.Text(str(result['max_drops_on_square']))),
-            ft.DataCell(ft.Text(f"{result['average_drops']:.2f}"))  # Format to 2 decimal places
+            ft.DataCell(ft.Text(str(result['X']))),
+            ft.DataCell(ft.Text(str(result['Y']))),
+            ft.DataCell(ft.Text(str(result['A']))),
+            ft.DataCell(ft.Text(str(result['A1']))),
+            ft.DataCell(ft.Text(str(result['A2']))),
+            ft.DataCell(ft.Text(str(result['A3']))),
+            ft.DataCell(ft.Text(str(result['B']))),
+            ft.DataCell(ft.Text(f"{result['C']:.2f}"))  # Format to 2 decimal places
         ]))
     data_table = ft.DataTable(
             columns=columns,
@@ -342,13 +345,23 @@ def create_results_page(page: ft.Page):
     )
     
 def create_graph_page():
-    scatter_chart = ScatterChart()
+    global results, selected_graph_vars
+
+    if not selected_graph_vars:
+        return ft.Column([ft.Text("Please select at least one variable to plot.")])
+
+    # 'X' is used for the x-axis
+    x_var = 'X'
+    # The selected variables are used for the y-axis
+    y_vars = selected_graph_vars
+
+    scatter_chart = ScatterChart(data=results, x_var=x_var, y_vars=y_vars)
 
     return ft.Column(
         [
             scatter_chart
         ],
-        alignment=ft.MainAxisAlignment.START, expand=8#, height=800, scroll=ft.ScrollMode.AUTO
+        alignment=ft.MainAxisAlignment.START, expand=8
     )
 
 async def main(page: ft.Page):
