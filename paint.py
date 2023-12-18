@@ -135,8 +135,10 @@ MIN_REPETITIONS = 1
 MAX_REPETITIONS = 100
 
 
+results = []
 # Function to create the form for the experiment page
 def create_experiment_form(page):
+    global results
     # Placeholder for dynamic controls
     dynamic_controls_view = ft.Column()
     repetitions_input = ft.TextField(label="Repetitions:", hint_text="Enter number of repetitions")
@@ -181,12 +183,13 @@ def create_experiment_form(page):
     )
 
     async def run_simulations(e):
+        global results
         values = list(map(int, values_input.value.split(',')))
         total_simulations = 0
-        results = []
         independent_variable = independent_variable_dropdown.value
         color1, color2, color3 = [color_pickers[color_idx].icon_color for color_idx in range(3)]
         simulations_run = 0
+        results = []
         if independent_variable == "D":
             repetitions = int(repetitions_input.value)
             total_simulations = len(values) * repetitions
@@ -225,11 +228,29 @@ def create_experiment_form(page):
 
     continue_button = ft.ElevatedButton("Continue", on_click=run_simulations)
     progress_indicator = ft.ProgressBar(value=0)
-    results = []
-
 
     async def PAINT_ONCE(x, y, c1, c2, c3, s):
-        return {} # simulation_result
+        # Instantiate a new GridModel with the given dimensions and stopping condition
+        grid_model = GridModel(x, y, s)
+
+        # Continue painting until the stopping condition is met
+        while True:
+            # Generate random positions for the raindrop
+            i = random.randint(0, x - 1)
+            j = random.randint(0, y - 1)
+
+            # Randomly choose one of the three colors
+            color = random.choice([c1, c2, c3])
+
+            # Paint the grid cell and check the result
+            result = grid_model.paint(i, j, color)
+
+            # If the stopping condition is met, return the result
+            if result:
+                return result
+
+            # Sleep briefly to simulate time passing (adjust as needed)
+            await asyncio.sleep(0.01)
 
     return ft.Column(
                     [
@@ -241,11 +262,49 @@ def create_experiment_form(page):
                         continue_button,
                         progress_indicator
                     ],
-                    alignment=ft.MainAxisAlignment.START, expand=8, scroll=ft.ScrollMode.ALWAYS
+                    alignment=ft.MainAxisAlignment.START, expand=8
                 )
 
+
+def create_results_page():
+    global results
+    A1_color, A2_color, A3_color = [color_pickers[color_idx].icon_color for color_idx in range(3)]
+    rows = []
+    columns=[
+                ft.DataColumn(ft.Text("A"), numeric=True),
+                ft.DataColumn(ft.Text("A1"), numeric=True),
+                ft.DataColumn(ft.Text("A2"), numeric=True),
+                ft.DataColumn(ft.Text("A3"), numeric=True),
+                ft.DataColumn(ft.Text("B"), numeric=True),
+                ft.DataColumn(ft.Text("C"), numeric=True),
+            ]
+
+    for result in results:
+        rows.append(ft.DataRow(cells=[
+            ft.DataCell(ft.Text(str(result['total_drops']))),
+            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A1_color, 0)))),
+            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A2_color, 0)))),
+            ft.DataCell(ft.Text(str(result['drops_by_color'].get(A3_color, 0)))),
+            ft.DataCell(ft.Text(str(result['max_drops_on_square']))),
+            ft.DataCell(ft.Text(f"{result['average_drops']:.2f}"))  # Format to 2 decimal places
+        ]))
+    data_table = ft.DataTable(
+            columns=columns,
+            rows=rows, expand=True
+        )
+
+    scatter_chart = ScatterChart()
+    return ft.Column(
+            [
+                data_table,
+                scatter_chart
+            ],
+            alignment=ft.MainAxisAlignment.START, expand=8, height=800, scroll=ft.ScrollMode.AUTO
+        )
+    
+
 async def main(page: ft.Page):
-    global color_pickers
+    global color_pickers, results
     visit_simulator_button.on_click = lambda _: page.go("/simulator")
     page.title = "RandomPainter.xyz"
     page.bgcolor = ft.colors.WHITE
@@ -391,13 +450,7 @@ async def main(page: ft.Page):
         if page.route == "/simulator":
             pass
         elif page.route == "/results":
-            scatter_chart = ScatterChart()
-            content_section = ft.Column(
-                    [
-                        scatter_chart
-                    ],
-                    alignment=ft.MainAxisAlignment.START, expand=8
-                )
+            content_section = create_results_page()
         elif page.route == "/experiment":
             content_section = create_experiment_form(page)
         else: # page.route == "/":
@@ -421,8 +474,7 @@ async def main(page: ft.Page):
                     ft.VerticalDivider(width=1),
                     content_section,
                 ],
-                expand=True,
-#                height=600,
+                height=800, expand=True,
                 alignment=ft.MainAxisAlignment.START
             )
 
@@ -430,7 +482,6 @@ async def main(page: ft.Page):
         container_with_bgcolor = ft.Container(
             content=row,
             bgcolor=ft.colors.WHITE,  # Set the background color here
-            expand=True
         )
 
         page.views.append(container_with_bgcolor)
