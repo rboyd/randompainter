@@ -38,6 +38,8 @@ class GridModel:
         total_drops = sum(sum(row) for row in self.grid)
         average_drops = total_drops / self.total_cells
         return {
+            'x': self.width,
+            'y': self.height,
             'total_drops': self.total_drops,
             'drops_by_color': dict(self.drops_by_color),
             'max_drops_on_square': self.max_drops_on_square,

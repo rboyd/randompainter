@@ -136,6 +136,7 @@ MAX_REPETITIONS = 100
 
 
 results = []
+independent_variable = 'D'
 # Function to create the form for the experiment page
 def create_experiment_form(page):
     global results
@@ -183,7 +184,7 @@ def create_experiment_form(page):
     )
 
     async def run_simulations(e):
-        global results
+        global results, independent_variable
         values = list(map(int, values_input.value.split(',')))
         total_simulations = 0
         independent_variable = independent_variable_dropdown.value
@@ -265,12 +266,14 @@ def create_experiment_form(page):
                     alignment=ft.MainAxisAlignment.START, expand=8
                 )
 
-
-def create_results_page():
+selected_graph_vars = []
+def create_results_page(page: ft.Page):
     global results
     A1_color, A2_color, A3_color = [color_pickers[color_idx].icon_color for color_idx in range(3)]
     rows = []
     columns=[
+                ft.DataColumn(ft.Text("X"), numeric=True),
+                ft.DataColumn(ft.Text("Y"), numeric=True),
                 ft.DataColumn(ft.Text("A"), numeric=True),
                 ft.DataColumn(ft.Text("A1"), numeric=True),
                 ft.DataColumn(ft.Text("A2"), numeric=True),
@@ -281,6 +284,8 @@ def create_results_page():
 
     for result in results:
         rows.append(ft.DataRow(cells=[
+            ft.DataCell(ft.Text(str(result['x']))),
+            ft.DataCell(ft.Text(str(result['y']))),
             ft.DataCell(ft.Text(str(result['total_drops']))),
             ft.DataCell(ft.Text(str(result['drops_by_color'].get(A1_color, 0)))),
             ft.DataCell(ft.Text(str(result['drops_by_color'].get(A2_color, 0)))),
@@ -293,15 +298,58 @@ def create_results_page():
             rows=rows, expand=True
         )
 
-    scatter_chart = ScatterChart()
+    # Function to handle button toggle
+    def toggle_button(e):
+        global selected_graph_vars
+        if e.control.text in selected_graph_vars:
+            selected_graph_vars.remove(e.control.text)
+            e.control.bgcolor = ft.colors.BLACK  # Set to default color when unselected
+        else:
+            if len(selected_graph_vars) >= 2:
+                # Unselect the first selected button
+                first_selected = selected_graph_vars.pop(0)
+                # Find the button control and reset its bgcolor
+                for control in button_row.controls:
+                    if control.text == first_selected:
+                        control.bgcolor = ft.colors.BLACK
+                        break
+            selected_graph_vars.append(e.control.text)
+            e.control.bgcolor = ft.colors.BLUE  # Set to selected color
+        continue_button.visible = len(selected_graph_vars) > 0
+        page.update()
+
+    # Create buttons for A, A1, A2, A3, B, and C
+    button_labels = ['A', 'A1', 'A2', 'A3', 'B', 'C']
+    button_row = ft.Row(
+        controls=[
+            ft.ElevatedButton(text=label, on_click=toggle_button) for label in button_labels],
+        alignment=ft.MainAxisAlignment.START
+    )
+
+    # Create the "Continue" button
+    continue_button = ft.ElevatedButton(
+        "Continue",
+        on_click=lambda _: page.go("/graph"),
+        visible=False  # Initially hidden until a button is toggled on
+    )
     return ft.Column(
-            [
-                data_table,
-                scatter_chart
-            ],
-            alignment=ft.MainAxisAlignment.START, expand=8, height=800, scroll=ft.ScrollMode.AUTO
-        )
+        [
+            button_row,
+            continue_button,
+            data_table
+        ],
+        alignment=ft.MainAxisAlignment.START, expand=8, height=800, scroll=ft.ScrollMode.AUTO
+    )
     
+def create_graph_page():
+    scatter_chart = ScatterChart()
+
+    return ft.Column(
+        [
+            scatter_chart
+        ],
+        alignment=ft.MainAxisAlignment.START, expand=8#, height=800, scroll=ft.ScrollMode.AUTO
+    )
 
 async def main(page: ft.Page):
     global color_pickers, results
@@ -450,9 +498,11 @@ async def main(page: ft.Page):
         if page.route == "/simulator":
             pass
         elif page.route == "/results":
-            content_section = create_results_page()
+            content_section = create_results_page(page)
         elif page.route == "/experiment":
             content_section = create_experiment_form(page)
+        elif page.route == "/graph":
+            content_section = create_graph_page()
         else: # page.route == "/":
             content_section = ft.Column(
                     [
